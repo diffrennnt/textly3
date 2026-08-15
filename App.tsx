@@ -17,7 +17,7 @@ import {
   markMessageAsNotified,
   clearNotifiedMessage,
 } from './utils/notifications';
-import { calculateNextOccurrence } from './utils/recurrence';
+import { calculateNextOccurrence } from "./recurrence";
 
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
