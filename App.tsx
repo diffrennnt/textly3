@@ -19,7 +19,7 @@ import {
 } from "./notifications";
 import { calculateNextOccurrence } from "./recurrence";
 
-import { BottomNav } from './components/BottomNav';
+import { BottomNav } from './BottomNav';
 import { HomeScreen } from './components/HomeScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
 import { HistoryScreen } from './components/HistoryScreen';
