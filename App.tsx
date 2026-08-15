@@ -6,7 +6,7 @@ import {
   loadSettings,
   saveSettings,
   INITIAL_SEED_MESSAGES
-} from './utils/storage';
+} from "./storage";
 import {
   playNotificationSound,
   getNotificationPermissionStatus,
