@@ -16,7 +16,7 @@ import {
   syncSchedulesToServiceWorker,
   markMessageAsNotified,
   clearNotifiedMessage,
-} from './utils/notifications';
+} from "./notifications";
 import { calculateNextOccurrence } from "./recurrence";
 
 import { BottomNav } from './components/BottomNav';
