@@ -20,7 +20,7 @@ import {
 import { calculateNextOccurrence } from "./recurrence";
 
 import { BottomNav } from './BottomNav';
-import { HomeScreen } from './components/HomeScreen';
+import { HomeScreen } from "./HomeScreen";
 import { ScheduleScreen } from './components/ScheduleScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { SettingsScreen } from './components/SettingsScreen';
@@ -463,4 +463,3 @@ export default function App() {
     </div>
   );
 }
-
