@@ -1,0 +1,33 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#059669" />
+  <defs>
+    <linearGradient id="bubbleGrad" x1="50" y1="50" x2="450" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#34D399" />
+      <stop offset="100%" stopColor="#059669" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Chat Bubble -->
+  <path
+    d="M 120 130 C 120 70 170 30 290 30 C 410 30 470 70 470 160 C 470 250 390 300 280 300 C 240 300 205 292 180 280 C 120 330 65 338 50 338 C 45 338 42 332 45 325 C 58 300 78 268 85 248 C 60 215 45 175 45 130 C 45 100 65 50 120 130 Z"
+    fill="url(#bubbleGrad)"
+    transform="scale(0.88) translate(35, 30)"
+    filter="url(#shadow)"
+  />
+
+  <!-- Three White Bubble Dots -->
+  <circle cx="180" cy="205" r="22" fill="#FFFFFF" />
+  <circle cx="256" cy="205" r="22" fill="#FFFFFF" />
+  <circle cx="332" cy="205" r="22" fill="#FFFFFF" />
+
+  <!-- Clock Overlay Badge on Bottom Right -->
+  <g filter="url(#shadow)">
+    <circle cx="360" cy="360" r="115" fill="#FFFFFF" stroke="#059669" stroke-width="22" />
+    <circle cx="360" cy="360" r="14" fill="#0F172A" />
+    <line x1="360" y1="360" x2="360" y2="295" stroke="#0F172A" stroke-width="18" stroke-linecap="round" />
+    <line x1="360" y1="360" x2="415" y2="385" stroke="#0F172A" stroke-width="18" stroke-linecap="round" />
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "name": "Textly",
+  "description": "Schedule messages. Never forget to send them. Features user-controlled notifications, clipboard copying, and WhatsApp integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
