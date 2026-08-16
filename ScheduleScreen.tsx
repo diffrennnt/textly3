@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { DatePickerModal } from './DatePickerModal';
 import { TimePickerModal } from './TimePickerModal';
-import { getRepeatLabel, getOrdinalSuffix } from '../utils/recurrence';
+import { getRepeatLabel, getOrdinalSuffix } from './recurrence';
 
 interface ScheduleScreenProps {
   onSave: (message: Omit<ScheduledMessage, 'id' | 'createdAt' | 'status'> & { id?: string }) => void;
