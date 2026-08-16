@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScheduledMessage, Platform, RepeatOption } from '../types';
 import { MessageSquare, ArrowLeft, ChevronRight, Calendar, Clock, Repeat, Sparkles } from 'lucide-react';
 import { getRepeatLabel } from './recurrence';
-import { openWhatsAppContactPicker } from './utils/whatsapp';
+import { openWhatsAppContactPicker, pickWhatsAppContact } from './utils/whatsapp';
 
 interface ScheduleScreenProps {
   onSave: (message: Omit<ScheduledMessage, 'id' | 'createdAt' | 'status'> & { id?: string }) => void;
@@ -47,6 +47,7 @@ const formatTime = (time: string) => {
 export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel, editingMessage }) => {
   const initial = getInitialDateTime(editingMessage);
   const [recipientName, setRecipientName] = useState(editingMessage?.recipientName || 'WhatsApp Contact');
+  const [recipientPhone, setRecipientPhone] = useState(editingMessage?.recipientPhone || '');
   const [message, setMessage] = useState(editingMessage?.message || '');
   const [date, setDate] = useState(initial.date);
   const [time, setTime] = useState(initial.time);
@@ -59,6 +60,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
   useEffect(() => {
     const next = getInitialDateTime(editingMessage);
     setRecipientName(editingMessage?.recipientName || 'WhatsApp Contact');
+    setRecipientPhone(editingMessage?.recipientPhone || '');
     setMessage(editingMessage?.message || '');
     setDate(next.date);
     setTime(next.time);
@@ -66,11 +68,24 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
     setContactHint('');
   }, [editingMessage]);
 
-  const handleChooseContact = () => {
+  const handleChooseContact = async () => {
+    setContactHint('');
+
+    // Prefer the browser's native contact picker. On supported Android browsers
+    // this lets the user choose a phone contact and returns the number to Textly.
+    const picked = await pickWhatsAppContact();
+    if (picked) {
+      setRecipientName(picked.name);
+      setRecipientPhone(picked.phone);
+      setContactHint('Contact selected. Textly saved the number for this schedule.');
+      return;
+    }
+
+    // Fallback: open WhatsApp itself. WhatsApp does not expose its private
+    // contact list to a website, so Textly cannot read the selected contact back.
     const opened = openWhatsAppContactPicker(message);
-    setRecipientName('WhatsApp Contact');
     setContactHint(opened
-      ? 'WhatsApp opened. Choose the contact there, then return to Textly to finish scheduling.'
+      ? 'WhatsApp opened. Choose a recipient there. This browser cannot return the selected number to Textly, so use the contact picker when available.'
       : 'Could not open WhatsApp. Make sure WhatsApp is installed on your phone.');
   };
 
@@ -100,7 +115,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
     onSave({
       id: editingMessage?.id,
       recipientName: recipientName.trim() || 'WhatsApp Contact',
-      recipientPhone: editingMessage?.recipientPhone || '',
+      recipientPhone,
       message: message.trim(),
       scheduledAt: scheduledDate.toISOString(),
       platform,
@@ -130,13 +145,13 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
               <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center"><MessageSquare className="w-5 h-5" /></div>
               <div>
                 <span className="text-sm font-semibold text-slate-900 block">{recipientName === 'WhatsApp Contact' ? 'Choose WhatsApp contact' : recipientName}</span>
-                <span className="text-[11px] text-slate-500">Tap to open WhatsApp's recipient picker</span>
+                <span className="text-[11px] text-slate-500">{recipientPhone ? `Saved number: ${recipientPhone}` : 'Tap to choose a contact'}</span>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400" />
           </button>
           {contactHint && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">{contactHint}</p>}
-          <p className="text-[11px] text-slate-500 px-1">WhatsApp does not expose its private contact list to a web app. Textly opens WhatsApp so you choose the recipient there.</p>
+          <p className="text-[11px] text-slate-500 px-1">On supported Android browsers, Textly uses the phone's contact picker. WhatsApp's private contact list itself is not exposed to websites.</p>
         </section>
 
         <section className="space-y-2">
