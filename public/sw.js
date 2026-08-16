@@ -3,22 +3,18 @@ const STORE_NAME = 'schedules';
 const timers = new Map();
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    self.clients.claim().then(() => restoreSchedules())
-  );
+  event.waitUntil(self.clients.claim().then(() => restoreSchedules()));
 });
 
 function openDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -84,22 +80,24 @@ async function notifySchedule(schedule) {
     ? `https://wa.me/${phone}?text=${encodeURIComponent(schedule.message || '')}`
     : `https://wa.me/?text=${encodeURIComponent(schedule.message || '')}`;
 
+  // These are the strongest notification options exposed by the Web
+  // Notifications API. Android/Chrome ultimately decides whether this is
+  // rendered as a heads-up banner or only in the notification shade.
   await self.registration.showNotification('Textly — Message Ready', {
     body: schedule.recipientName
       ? `Your message for ${schedule.recipientName} is ready to send.`
       : 'Your scheduled message is ready to send.',
     icon: '/icon.svg',
     badge: '/badge.svg',
-    tag: `textly-msg-${messageId}`,
+    tag: `textly-msg-${messageId}-${Date.now()}`,
     renotify: true,
     requireInteraction: true,
     silent: false,
-    vibrate: [200, 100, 200, 100, 200],
-    data: {
-      messageId,
-      url,
-      whatsappUrl,
-    },
+    vibrate: [250, 100, 250, 100, 400],
+    timestamp: Date.now(),
+    dir: 'auto',
+    lang: 'en-US',
+    data: { messageId, url, whatsappUrl },
     actions: [
       { action: 'open_whatsapp', title: 'Open in WhatsApp' },
       { action: 'open_textly', title: 'Open Textly' },
@@ -107,28 +105,20 @@ async function notifySchedule(schedule) {
   });
 
   const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of allClients) {
-    client.postMessage({ type: 'TEXTLY_MESSAGE_DUE', messageId });
-  }
+  for (const client of allClients) client.postMessage({ type: 'TEXTLY_MESSAGE_DUE', messageId });
 }
 
 async function handleDue(schedule) {
   clearTimer(schedule.id);
-
-  try {
-    await notifySchedule(schedule);
-  } catch (error) {
-    console.warn('Textly background notification failed:', error);
-  }
+  try { await notifySchedule(schedule); }
+  catch (error) { console.warn('Textly background notification failed:', error); }
 
   if (schedule.repeat && schedule.repeat !== 'never') {
     const next = nextOccurrence(schedule.scheduledAt, schedule.repeat);
     if (next) {
       const updated = { ...schedule, scheduledAt: next };
       const schedules = await readSchedules();
-      const remaining = schedules.filter((item) => item.id !== schedule.id);
-      remaining.push(updated);
-      await saveSchedules(remaining);
+      await saveSchedules([...schedules.filter((item) => item.id !== schedule.id), updated]);
       armSchedule(updated);
       return;
     }
@@ -141,53 +131,34 @@ async function handleDue(schedule) {
 function armSchedule(schedule) {
   if (!schedule || schedule.isPaused || schedule.status !== 'scheduled') return;
   clearTimer(schedule.id);
-
   const target = new Date(schedule.scheduledAt).getTime();
   if (!Number.isFinite(target)) return;
   const delay = target - Date.now();
-
-  // A browser service worker may be terminated while idle. The timeout gives
-  // us background behavior while the worker remains alive; durable exact-time
-  // delivery requires Web Push from a server and is added separately.
-  if (delay <= 0) {
-    setTimeout(() => handleDue(schedule), 0);
-    return;
-  }
-
-  timers.set(schedule.id, setTimeout(() => handleDue(schedule), delay));
+  timers.set(schedule.id, setTimeout(() => handleDue(schedule), Math.max(0, delay)));
 }
 
 self.addEventListener('message', (event) => {
   if (!event.data) return;
-
   if (event.data.type === 'SYNC_SCHEDULES') {
     const schedules = Array.isArray(event.data.schedules) ? event.data.schedules : [];
-    event.waitUntil(
-      saveSchedules(schedules).then(() => {
-        for (const [id] of timers) {
-          if (!schedules.some((schedule) => schedule.id === id)) clearTimer(id);
-        }
-        for (const schedule of schedules) armSchedule(schedule);
-      })
-    );
+    event.waitUntil(saveSchedules(schedules).then(() => {
+      for (const [id] of timers) if (!schedules.some((schedule) => schedule.id === id)) clearTimer(id);
+      for (const schedule of schedules) armSchedule(schedule);
+    }));
   }
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  const targetUrl = event.action === 'open_whatsapp'
-    ? (data.whatsappUrl || 'https://wa.me/')
-    : (data.url || '/');
-
+  const targetUrl = event.action === 'open_whatsapp' ? (data.whatsappUrl || 'https://wa.me/') : (data.url || '/');
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ('focus' in client) {
           client.focus();
-          if ('navigate' in client && targetUrl.startsWith('/')) client.navigate(targetUrl);
-          else if (targetUrl.startsWith('http')) self.clients.openWindow(targetUrl);
-          return;
+          if ('navigate' in client && targetUrl.startsWith('/')) return client.navigate(targetUrl);
+          if (targetUrl.startsWith('http')) return self.clients.openWindow(targetUrl);
         }
       }
       return self.clients.openWindow(targetUrl);
