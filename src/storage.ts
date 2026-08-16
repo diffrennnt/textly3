@@ -5,7 +5,7 @@ const STORAGE_KEY_SETTINGS = 'messagelater_settings_v1';
 const STORAGE_KEY_LOGS = 'messagelater_logs_v1';
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  defaultCountryCode: '+1',
+  defaultCountryCode: '+27',
   soundEnabled: true,
   browserNotificationsEnabled: true,
   autoOpenWhatsAppOnTap: false,
@@ -16,9 +16,9 @@ export const INITIAL_SEED_MESSAGES: ScheduledMessage[] = [
   {
     id: 'msg-seed-1',
     recipientName: 'Mom ❤️',
-    recipientPhone: '+1 555-0188',
+    recipientPhone: '+27 82 000 0001',
     message: 'Happy birthday! Hope you have an amazing day ❤️',
-    scheduledAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(), // Tomorrow 8:00 PM
+    scheduledAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     status: 'scheduled',
     platform: 'whatsapp',
@@ -27,9 +27,9 @@ export const INITIAL_SEED_MESSAGES: ScheduledMessage[] = [
   {
     id: 'msg-seed-2',
     recipientName: 'John',
-    recipientPhone: '+1 555-0192',
+    recipientPhone: '+27 82 000 0002',
     message: "Don't forget about our meeting.",
-    scheduledAt: new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(), // 2 days from now 10:00 AM
+    scheduledAt: new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
     status: 'scheduled',
     platform: 'whatsapp',
@@ -63,7 +63,12 @@ export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SETTINGS);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const saved = JSON.parse(raw) as Partial<AppSettings>;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      simulateAndroidDrawer: true,
+    };
   } catch (err) {
     console.error('Error loading settings:', err);
     return DEFAULT_SETTINGS;
