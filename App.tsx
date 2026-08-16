@@ -44,7 +44,8 @@ export default function App() {
     () => loadSettings()
   );
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('home');
+  const [activeTab, setActiveTab] =
+    useState<ActiveTab>('home');
 
   const [selectedMessage, setSelectedMessage] =
     useState<ScheduledMessage | null>(null);
@@ -57,14 +58,15 @@ export default function App() {
       () => getNotificationPermissionStatus()
     );
 
-  const [activeNotification, setActiveNotification] = useState<{
-    message?: ScheduledMessage;
-    title: string;
-    body: string;
-    time: string;
-  } | null>(null);
+  const [activeNotification, setActiveNotification] =
+    useState<{
+      message?: ScheduledMessage;
+      title: string;
+      body: string;
+      time: string;
+    } | null>(null);
 
-  // Save messages and sync with service worker
+  // Save messages
   useEffect(() => {
     saveMessages(messages);
     syncSchedulesToServiceWorker(messages);
@@ -86,7 +88,10 @@ export default function App() {
       const handleServiceWorkerMessage = (
         event: MessageEvent
       ) => {
-        if (event.data?.type === 'TEXTLY_OPEN_MESSAGE') {
+        if (
+          event.data?.type ===
+          'TEXTLY_OPEN_MESSAGE'
+        ) {
           const msgId = event.data.messageId;
 
           if (msgId) {
@@ -104,7 +109,10 @@ export default function App() {
           }
         }
 
-        if (event.data?.type === 'TEXTLY_MESSAGE_DUE') {
+        if (
+          event.data?.type ===
+          'TEXTLY_MESSAGE_DUE'
+        ) {
           const msgId = event.data.messageId;
 
           if (msgId) {
@@ -141,15 +149,18 @@ export default function App() {
     }
   }, []);
 
-  // Open message from URL
+  // Handle notification URL
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {
+      return;
+    }
 
     const params = new URLSearchParams(
       window.location.search
     );
 
-    const openMsgId = params.get('openMsgId');
+    const openMsgId =
+      params.get('openMsgId');
 
     if (openMsgId) {
       const found = messages.find(
@@ -167,12 +178,12 @@ export default function App() {
           window.location.pathname
         );
       } catch {
-        // Ignore URL cleanup errors
+        // Ignore
       }
     }
   }, [messages]);
 
-  // Message scheduler
+  // Check scheduled messages
   useEffect(() => {
     const evaluateDueMessages = () => {
       const now = Date.now();
@@ -180,105 +191,118 @@ export default function App() {
       setMessages((prevMessages) => {
         let hasChanges = false;
 
-        const updated = prevMessages.map((msg) => {
-          if (
-            msg.status === 'scheduled' &&
-            !msg.isPaused
-          ) {
-            const scheduledTime = new Date(
-              msg.scheduledAt
-            ).getTime();
+        const updated =
+          prevMessages.map((msg) => {
+            if (
+              msg.status === 'scheduled' &&
+              !msg.isPaused
+            ) {
+              const scheduledTime =
+                new Date(
+                  msg.scheduledAt
+                ).getTime();
 
-            if (scheduledTime <= now) {
-              hasChanges = true;
+              if (scheduledTime <= now) {
+                hasChanges = true;
 
-              const isFirstAlert =
-                markMessageAsNotified(msg.id);
+                const isFirstAlert =
+                  markMessageAsNotified(
+                    msg.id
+                  );
 
-              if (isFirstAlert) {
-                if (settings.soundEnabled) {
-                  playNotificationSound();
-                }
+                if (isFirstAlert) {
+                  if (
+                    settings.soundEnabled
+                  ) {
+                    playNotificationSound();
+                  }
 
-                const notifTitle =
-                  'Textly — Message Ready';
+                  const title =
+                    'Textly — Message Ready';
 
-                const notifBody =
-                  'Your scheduled message is ready to send.';
+                  const body =
+                    'Your scheduled message is ready to send.';
 
-                sendBrowserNotification(
-                  notifTitle,
-                  notifBody,
-                  {
-                    messageId: msg.id,
-                    recipientName:
-                      msg.recipientName,
-                    messageText: msg.message,
-                  },
-                  () => {
-                    setSelectedMessage({
-                      ...msg,
-                      status: 'ready',
+                  sendBrowserNotification(
+                    title,
+                    body,
+                    {
+                      messageId: msg.id,
+                      recipientName:
+                        msg.recipientName,
+                      messageText:
+                        msg.message,
+                    },
+                    () => {
+                      setSelectedMessage({
+                        ...msg,
+                        status: 'ready',
+                      });
+                    }
+                  );
+
+                  if (
+                    settings.simulateAndroidDrawer
+                  ) {
+                    setActiveNotification({
+                      message: {
+                        ...msg,
+                        status: 'ready',
+                      },
+                      title,
+                      body,
+                      time: 'Just now',
                     });
                   }
-                );
-
-                if (
-                  settings.simulateAndroidDrawer
-                ) {
-                  setActiveNotification({
-                    message: {
-                      ...msg,
-                      status: 'ready',
-                    },
-                    title: notifTitle,
-                    body: notifBody,
-                    time: 'Just now',
-                  });
                 }
-              }
 
-              // Recurring message
-              if (
-                msg.repeat &&
-                msg.repeat !== 'never'
-              ) {
-                const nextTime =
-                  calculateNextOccurrence(
-                    msg.scheduledAt,
-                    msg.repeat,
-                    now
-                  );
+                // Recurring message
+                if (
+                  msg.repeat &&
+                  msg.repeat !== 'never'
+                ) {
+                  const nextTime =
+                    calculateNextOccurrence(
+                      msg.scheduledAt,
+                      msg.repeat,
+                      now
+                    );
+
+                  return {
+                    ...msg,
+                    scheduledAt: nextTime,
+                    status:
+                      'scheduled' as const,
+                  };
+                }
 
                 return {
                   ...msg,
-                  scheduledAt: nextTime,
-                  status: 'scheduled' as const,
+                  status:
+                    'ready' as const,
                 };
               }
-
-              return {
-                ...msg,
-                status: 'ready' as const,
-              };
             }
-          }
 
-          return msg;
-        });
+            return msg;
+          });
 
-        return hasChanges ? updated : prevMessages;
+        return hasChanges
+          ? updated
+          : prevMessages;
       });
     };
 
-    const interval = setInterval(
-      evaluateDueMessages,
-      2500
-    );
+    const interval =
+      setInterval(
+        evaluateDueMessages,
+        2500
+      );
 
-    const handleVisibilityOrFocus = () => {
+    const handleVisibility = () => {
       if (
-        document.visibilityState === 'visible'
+        document.visibilityState ===
+        'visible'
       ) {
         evaluateDueMessages();
       }
@@ -286,17 +310,17 @@ export default function App() {
 
     document.addEventListener(
       'visibilitychange',
-      handleVisibilityOrFocus
+      handleVisibility
     );
 
     window.addEventListener(
       'focus',
-      handleVisibilityOrFocus
+      handleVisibility
     );
 
     window.addEventListener(
       'pageshow',
-      handleVisibilityOrFocus
+      handleVisibility
     );
 
     return () => {
@@ -304,17 +328,17 @@ export default function App() {
 
       document.removeEventListener(
         'visibilitychange',
-        handleVisibilityOrFocus
+        handleVisibility
       );
 
       window.removeEventListener(
         'focus',
-        handleVisibilityOrFocus
+        handleVisibility
       );
 
       window.removeEventListener(
         'pageshow',
-        handleVisibilityOrFocus
+        handleVisibility
       );
     };
   }, [
@@ -333,7 +357,7 @@ export default function App() {
       return status;
     };
 
-  // Save or edit message
+  // Create or edit message
   const handleSaveMessage = (
     data: Omit<
       ScheduledMessage,
@@ -343,7 +367,9 @@ export default function App() {
     }
   ) => {
     if (data.id) {
-      clearNotifiedMessage(data.id);
+      clearNotifiedMessage(
+        data.id
+      );
 
       setMessages((prev) =>
         prev.map((m) =>
@@ -354,49 +380,57 @@ export default function App() {
                   data.recipientName,
                 recipientPhone:
                   data.recipientPhone,
-                message: data.message,
+                message:
+                  data.message,
                 scheduledAt:
                   data.scheduledAt,
                 repeat:
-                  data.repeat || 'never',
-                status: 'scheduled',
+                  data.repeat ||
+                  'never',
+                status:
+                  'scheduled',
                 isPaused: false,
               }
             : m
         )
       );
     } else {
-      const newMsg: ScheduledMessage = {
-        id: `msg-${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(2, 7)}`,
+      const newMessage: ScheduledMessage =
+        {
+          id: `msg-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 7)}`,
 
-        recipientName:
-          data.recipientName,
+          recipientName:
+            data.recipientName,
 
-        recipientPhone:
-          data.recipientPhone,
+          recipientPhone:
+            data.recipientPhone,
 
-        message: data.message,
+          message:
+            data.message,
 
-        scheduledAt:
-          data.scheduledAt,
+          scheduledAt:
+            data.scheduledAt,
 
-        createdAt:
-          new Date().toISOString(),
+          createdAt:
+            new Date().toISOString(),
 
-        status: 'scheduled',
+          status:
+            'scheduled',
 
-        platform: 'whatsapp',
+          platform:
+            'whatsapp',
 
-        repeat:
-          data.repeat || 'never',
+          repeat:
+            data.repeat ||
+            'never',
 
-        isPaused: false,
-      };
+          isPaused: false,
+        };
 
       setMessages((prev) => [
-        newMsg,
+        newMessage,
         ...prev,
       ]);
     }
@@ -405,127 +439,132 @@ export default function App() {
     setActiveTab('home');
   };
 
-  // Pause / resume recurring message
-  const handleTogglePauseMessage = (
-    msgId: string
-  ) => {
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id !== msgId) {
-          return m;
-        }
+  // Pause / resume
+  const handleTogglePauseMessage =
+    (msgId: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId) {
+            return m;
+          }
 
-        const willPause = !m.isPaused;
+          const willPause =
+            !m.isPaused;
 
-        if (
-          !willPause &&
-          m.repeat &&
-          m.repeat !== 'never'
-        ) {
-          const nextTime =
-            calculateNextOccurrence(
-              m.scheduledAt,
-              m.repeat,
-              Date.now()
-            );
+          if (
+            !willPause &&
+            m.repeat &&
+            m.repeat !== 'never'
+          ) {
+            const nextTime =
+              calculateNextOccurrence(
+                m.scheduledAt,
+                m.repeat,
+                Date.now()
+              );
 
-          return {
-            ...m,
-            isPaused: false,
-            scheduledAt: nextTime,
-          };
-        }
-
-        return {
-          ...m,
-          isPaused: willPause,
-        };
-      })
-    );
-  };
-
-  // Delete message
-  const handleDeleteMessage = (
-    msgId: string
-  ) => {
-    clearNotifiedMessage(msgId);
-
-    setMessages((prev) =>
-      prev.filter((m) => m.id !== msgId)
-    );
-  };
-
-  // Cancel message
-  const handleCancelMessage = (
-    msgId: string
-  ) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId
-          ? {
+            return {
               ...m,
-              status: 'cancelled',
-            }
-          : m
-      )
-    );
-  };
-
-  // Mark as sent
-  const handleMarkAsSent = (
-    msgId: string
-  ) => {
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id !== msgId) {
-          return m;
-        }
-
-        if (
-          m.repeat &&
-          m.repeat !== 'never'
-        ) {
-          const nextTime =
-            calculateNextOccurrence(
-              m.scheduledAt,
-              m.repeat,
-              Date.now()
-            );
+              isPaused: false,
+              scheduledAt:
+                nextTime,
+            };
+          }
 
           return {
             ...m,
-            scheduledAt: nextTime,
-            status: 'scheduled' as const,
+            isPaused: willPause,
+          };
+        })
+      );
+    };
+
+  // Delete
+  const handleDeleteMessage =
+    (msgId: string) => {
+      clearNotifiedMessage(
+        msgId
+      );
+
+      setMessages((prev) =>
+        prev.filter(
+          (m) => m.id !== msgId
+        )
+      );
+    };
+
+  // Cancel
+  const handleCancelMessage =
+    (msgId: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId
+            ? {
+                ...m,
+                status:
+                  'cancelled',
+              }
+            : m
+        )
+      );
+    };
+
+  // Mark sent
+  const handleMarkAsSent =
+    (msgId: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId) {
+            return m;
+          }
+
+          if (
+            m.repeat &&
+            m.repeat !== 'never'
+          ) {
+            const nextTime =
+              calculateNextOccurrence(
+                m.scheduledAt,
+                m.repeat,
+                Date.now()
+              );
+
+            return {
+              ...m,
+              scheduledAt:
+                nextTime,
+              status:
+                'scheduled' as const,
+              sentAt:
+                new Date().toISOString(),
+            };
+          }
+
+          return {
+            ...m,
+            status:
+              'sent_manually' as const,
             sentAt:
               new Date().toISOString(),
           };
-        }
-
-        return {
-          ...m,
-          status:
-            'sent_manually' as const,
-          sentAt:
-            new Date().toISOString(),
-        };
-      })
-    );
-  };
+        })
+      );
+    };
 
   // Reschedule
-  const handleReschedule = (
-    msg: ScheduledMessage
-  ) => {
-    setEditingMessage({
-      ...msg,
-      scheduledAt: new Date(
-        Date.now() +
-          15 * 60 * 1000
-      ).toISOString(),
-    });
+  const handleReschedule =
+    (msg: ScheduledMessage) => {
+      setEditingMessage({
+        ...msg,
+        scheduledAt:
+          new Date(
+            Date.now() +
+              15 * 60 * 1000
+          ).toISOString(),
+      });
 
-    setActiveTab('schedule');
-  };
+      setActiveTab('schedule');
+    };
 
   // Test notification
   const handleTriggerTestNotification =
@@ -534,7 +573,8 @@ export default function App() {
       reason?: string;
     }> => {
       if (
-        permissionStatus !== 'granted'
+        permissionStatus !==
+        'granted'
       ) {
         return {
           success: false,
@@ -547,16 +587,16 @@ export default function App() {
         playNotificationSound();
       }
 
-      const notifTitle =
+      const title =
         'Textly — Test Notification';
 
-      const notifBody =
+      const body =
         'Notifications are working correctly!';
 
       const sent =
         await sendBrowserNotification(
-          notifTitle,
-          notifBody,
+          title,
+          body,
           {
             messageText:
               'Test notification from Textly',
@@ -570,8 +610,8 @@ export default function App() {
         settings.simulateAndroidDrawer
       ) {
         setActiveNotification({
-          title: notifTitle,
-          body: notifBody,
+          title,
+          body,
           time: 'Just now',
         });
       }
@@ -581,7 +621,7 @@ export default function App() {
       };
     };
 
-  // Reset data
+  // Reset sample data
   const handleResetData = () => {
     setMessages(
       INITIAL_SEED_MESSAGES
@@ -594,31 +634,37 @@ export default function App() {
 
   const scheduledCount =
     messages.filter(
-      (m) => m.status === 'scheduled'
+      (m) =>
+        m.status ===
+        'scheduled'
     ).length;
 
   const readyCount =
     messages.filter(
-      (m) => m.status === 'ready'
+      (m) =>
+        m.status ===
+        'ready'
     ).length;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-between">
 
-      {/* Android notification simulation */}
       <AndroidNotificationSim
         notification={
           activeNotification
         }
         onDismiss={() =>
-          setActiveNotification(null)
+          setActiveNotification(
+            null
+          )
         }
         onOpenMessage={(msg) =>
-          setSelectedMessage(msg)
+          setSelectedMessage(
+            msg
+          )
         }
       />
 
-      {/* Main application */}
       <main className="flex-1 w-full max-w-md mx-auto bg-slate-50 border-x border-slate-200/80 min-h-screen shadow-sm">
 
         {activeTab === 'home' && (
@@ -626,17 +672,27 @@ export default function App() {
             messages={messages}
 
             onScheduleClick={() => {
-              setEditingMessage(null);
-              setActiveTab('schedule');
+              setEditingMessage(
+                null
+              );
+              setActiveTab(
+                'schedule'
+              );
             }}
 
             onOpenMessage={(msg) =>
-              setSelectedMessage(msg)
+              setSelectedMessage(
+                msg
+              )
             }
 
             onEditMessage={(msg) => {
-              setEditingMessage(msg);
-              setActiveTab('schedule');
+              setEditingMessage(
+                msg
+              );
+              setActiveTab(
+                'schedule'
+              );
             }}
 
             onDeleteMessage={
@@ -664,11 +720,15 @@ export default function App() {
             }
 
             onViewAllClick={() =>
-              setActiveTab('history')
+              setActiveTab(
+                'history'
+              )
             }
 
             onOpenSettings={() =>
-              setActiveTab('settings')
+              setActiveTab(
+                'settings'
+              )
             }
           />
         )}
@@ -680,8 +740,12 @@ export default function App() {
             }
 
             onCancel={() => {
-              setEditingMessage(null);
-              setActiveTab('home');
+              setEditingMessage(
+                null
+              );
+              setActiveTab(
+                'home'
+              );
             }}
 
             editingMessage={
@@ -699,7 +763,9 @@ export default function App() {
             messages={messages}
 
             onOpenMessage={(msg) =>
-              setSelectedMessage(msg)
+              setSelectedMessage(
+                msg
+              )
             }
 
             onReschedule={
@@ -727,12 +793,14 @@ export default function App() {
             settings={settings}
 
             onUpdateSettings={(
-              newSet
+              newSettings
             ) =>
-              setSettings((prev) => ({
-                ...prev,
-                ...newSet,
-              }))
+              setSettings(
+                (prev) => ({
+                  ...prev,
+                  ...newSettings,
+                })
+              )
             }
 
             permissionStatus={
@@ -752,15 +820,19 @@ export default function App() {
             }
           />
         )}
+
       </main>
 
-      {/* Message modal */}
       {selectedMessage && (
         <MessagePreparationModal
-          message={selectedMessage}
+          message={
+            selectedMessage
+          }
 
           onClose={() =>
-            setSelectedMessage(null)
+            setSelectedMessage(
+              null
+            )
           }
 
           onMarkAsSent={
@@ -772,8 +844,12 @@ export default function App() {
           }
 
           onEdit={(msg) => {
-            setEditingMessage(msg);
-            setActiveTab('schedule');
+            setEditingMessage(
+              msg
+            );
+            setActiveTab(
+              'schedule'
+            );
           }}
 
           onCancel={
@@ -786,13 +862,18 @@ export default function App() {
         />
       )}
 
-      {/* Bottom navigation */}
       <BottomNav
-        activeTab={activeTab}
+        activeTab={
+          activeTab
+        }
 
         setActiveTab={(tab) => {
-          if (tab === 'schedule') {
-            setEditingMessage(null);
+          if (
+            tab === 'schedule'
+          ) {
+            setEditingMessage(
+              null
+            );
           }
 
           setActiveTab(tab);
@@ -806,6 +887,7 @@ export default function App() {
           readyCount
         }
       />
+
     </div>
   );
 }
