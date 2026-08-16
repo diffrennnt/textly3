@@ -4,7 +4,7 @@ let swRegistration: ServiceWorkerRegistration | null = null;
 const notifiedMessageIds = new Set<string>();
 
 /**
- * Registers the Textly Service Worker for Android/PWA notifications
+ * Registers the Textly Service Worker for Android/PWA notifications.
  */
 export async function initServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -14,11 +14,11 @@ export async function initServiceWorker(): Promise<ServiceWorkerRegistration | n
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
+      updateViaCache: 'none',
     });
-    swRegistration = registration;
 
-    // Check for updates
-    registration.update().catch(() => {});
+    swRegistration = registration;
+    await registration.update().catch(() => {});
 
     return registration;
   } catch (err) {
@@ -28,7 +28,7 @@ export async function initServiceWorker(): Promise<ServiceWorkerRegistration | n
 }
 
 /**
- * Sync active scheduled alarms to Service Worker for background reliability
+ * Sync active scheduled alarms to the Service Worker.
  */
 export function syncSchedulesToServiceWorker(schedules: ScheduledMessage[]): void {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -46,23 +46,25 @@ export function syncSchedulesToServiceWorker(schedules: ScheduledMessage[]): voi
       status: m.status,
     }));
 
+  const send = (registration: ServiceWorkerRegistration) => {
+    registration.active?.postMessage({
+      type: 'SYNC_SCHEDULES',
+      schedules: activeSchedules,
+    });
+  };
+
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SYNC_SCHEDULES',
       schedules: activeSchedules,
     });
   } else {
-    navigator.serviceWorker.ready.then((reg) => {
-      reg.active?.postMessage({
-        type: 'SYNC_SCHEDULES',
-        schedules: activeSchedules,
-      });
-    }).catch(() => {});
+    navigator.serviceWorker.ready.then(send).catch(() => {});
   }
 }
 
 /**
- * Plays a pleasant Web Audio API notification chime
+ * Plays a pleasant Web Audio API notification chime.
  */
 export function playNotificationSound(): void {
   try {
@@ -77,8 +79,6 @@ export function playNotificationSound(): void {
     }
 
     const now = ctx.currentTime;
-
-    // First note (E5 = 659.25Hz)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
@@ -90,7 +90,6 @@ export function playNotificationSound(): void {
     osc1.start(now);
     osc1.stop(now + 0.3);
 
-    // Second note (B5 = 987.77Hz)
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'sine';
@@ -107,21 +106,18 @@ export function playNotificationSound(): void {
 }
 
 /**
- * Triggers hardware vibration on supported Android devices
+ * Triggers hardware vibration on supported Android devices.
  */
 export function triggerHapticVibration(): void {
   try {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([200, 100, 200, 100, 200]);
     }
-  } catch (err) {
-    // Vibration not supported or blocked by user gesture policy
+  } catch {
+    // Vibration is not supported or is blocked by the browser.
   }
 }
 
-/**
- * Checks browser notification permission status
- */
 export function getNotificationPermissionStatus(): NotificationPermission | 'unsupported' {
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'unsupported';
@@ -129,16 +125,13 @@ export function getNotificationPermissionStatus(): NotificationPermission | 'uns
   return Notification.permission;
 }
 
-/**
- * Requests browser notification permission
- */
 export async function requestNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'unsupported';
   }
+
   try {
     const permission = await Notification.requestPermission();
-    // Also ensure Service Worker is ready when permission is granted
     if (permission === 'granted') {
       await initServiceWorker();
     }
@@ -156,27 +149,22 @@ export interface NotificationPayloadData {
   [key: string]: unknown;
 }
 
-/**
- * Marks a message as already notified to avoid duplicate OS popups
- */
 export function markMessageAsNotified(messageId: string): boolean {
   if (notifiedMessageIds.has(messageId)) {
-    return false; // Already notified
+    return false;
   }
   notifiedMessageIds.add(messageId);
   return true;
 }
 
-/**
- * Clears notified record when messages are rescheduled or edited
- */
 export function clearNotifiedMessage(messageId: string): void {
   notifiedMessageIds.delete(messageId);
 }
 
 /**
- * Triggers a real operating-system level Notification on Android and Desktop.
- * Prioritizes ServiceWorkerRegistration.showNotification() which is required on Android.
+ * Sends a real OS-level notification through the Service Worker first.
+ * Android/Chrome decides the final heads-up/pop-up presentation from the
+ * user's notification-channel/system settings; the web app cannot force it.
  */
 export async function sendBrowserNotification(
   title: string,
@@ -192,22 +180,29 @@ export async function sendBrowserNotification(
     return false;
   }
 
-  // Trigger hardware vibration if enabled on device
   triggerHapticVibration();
 
-  const tag = data?.messageId ? `textly-msg-${data.messageId}` : `textly-alert-${Date.now()}`;
+  const tag = data?.messageId
+    ? `textly-msg-${data.messageId}`
+    : `textly-alert-${Date.now()}`;
+
   const notificationOptions: NotificationOptions & Record<string, unknown> = {
     body,
     icon: '/icon.svg',
     badge: '/badge.svg',
     tag,
+    silent: false,
     renotify: true,
     requireInteraction: true,
+    timestamp: Date.now(),
+    dir: 'auto',
+    lang: 'en-US',
     data: {
       ...data,
-      url: data?.messageId ? `/?openMsgId=${encodeURIComponent(data.messageId)}` : '/',
+      url: data?.messageId
+        ? `/?openMsgId=${encodeURIComponent(data.messageId)}`
+        : '/',
     },
-    // Vibration pattern for Android system notifications
     vibrate: [200, 100, 200, 100, 200],
     actions: [
       {
@@ -217,20 +212,18 @@ export async function sendBrowserNotification(
     ],
   };
 
-  // 1. Primary path for Android & PWAs: ServiceWorkerRegistration.showNotification()
   if ('serviceWorker' in navigator) {
     try {
       const reg = swRegistration || (await navigator.serviceWorker.ready);
-      if (reg && 'showNotification' in reg) {
+      if (reg) {
         await reg.showNotification(title, notificationOptions);
         return true;
       }
     } catch (err) {
-      console.warn('ServiceWorker showNotification failed, attempting fallback:', err);
+      console.warn('Service Worker notification failed, attempting fallback:', err);
     }
   }
 
-  // 2. Secondary fallback for desktop environments without active SW
   try {
     const notif = new Notification(title, notificationOptions);
 
@@ -241,16 +234,14 @@ export async function sendBrowserNotification(
         notif.close();
       };
     }
+
     return true;
   } catch (err) {
-    console.warn('Direct Notification constructor failed (expected on Android Chrome if SW unavailable):', err);
+    console.warn('Direct Notification constructor failed:', err);
     return false;
   }
 }
 
-/**
- * Formats a date cleanly for human reading
- */
 export function formatScheduledDateTime(dateString: string): {
   dateFormatted: string;
   timeFormatted: string;
@@ -259,7 +250,6 @@ export function formatScheduledDateTime(dateString: string): {
 } {
   const target = new Date(dateString);
   const now = new Date();
-
   const isPast = target.getTime() <= now.getTime();
 
   const dateFormatted = target.toLocaleDateString(undefined, {
@@ -275,7 +265,6 @@ export function formatScheduledDateTime(dateString: string): {
     hour12: true,
   });
 
-  // Calculate relative text
   const diffMs = target.getTime() - now.getTime();
   const diffMins = Math.round(diffMs / (60 * 1000));
   const diffHours = Math.round(diffMs / (3600 * 1000));
@@ -294,10 +283,5 @@ export function formatScheduledDateTime(dateString: string): {
     else relative = `In ${diffDays} day${diffDays > 1 ? 's' : ''}`;
   }
 
-  return {
-    dateFormatted,
-    timeFormatted,
-    relative,
-    isPast,
-  };
+  return { dateFormatted, timeFormatted, relative, isPast };
 }
