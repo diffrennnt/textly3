@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScheduledMessage, Platform, RepeatOption } from '../types';
 import { MessageSquare, ArrowLeft, ChevronRight, Calendar, Clock, Repeat, Sparkles } from 'lucide-react';
 import { getRepeatLabel } from './recurrence';
-import { openWhatsAppContactPicker, pickWhatsAppContact } from './utils/whatsapp';
+import { pickWhatsAppContact } from './utils/whatsapp';
 
 interface ScheduleScreenProps {
   onSave: (message: Omit<ScheduledMessage, 'id' | 'createdAt' | 'status'> & { id?: string }) => void;
@@ -71,22 +71,20 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
   const handleChooseContact = async () => {
     setContactHint('');
 
-    // Prefer the browser's native contact picker. On supported Android browsers
-    // this lets the user choose a phone contact and returns the number to Textly.
+    // A web/PWA cannot read WhatsApp's private contact list or receive a
+    // callback containing the contact selected inside WhatsApp. The supported
+    // browser API is the Android contact picker, which returns the phone number
+    // to Textly so the same recipient can be opened later automatically.
     const picked = await pickWhatsAppContact();
-    if (picked) {
-      setRecipientName(picked.name);
-      setRecipientPhone(picked.phone);
-      setContactHint('Contact selected. Textly saved the number for this schedule.');
+
+    if (!picked) {
+      setContactHint('Choose a phone contact and Textly will save the number. WhatsApp does not allow websites to read the contact selected inside WhatsApp.');
       return;
     }
 
-    // Fallback: open WhatsApp itself. WhatsApp does not expose its private
-    // contact list to a website, so Textly cannot read the selected contact back.
-    const opened = openWhatsAppContactPicker(message);
-    setContactHint(opened
-      ? 'WhatsApp opened. Choose a recipient there. This browser cannot return the selected number to Textly, so use the contact picker when available.'
-      : 'Could not open WhatsApp. Make sure WhatsApp is installed on your phone.');
+    setRecipientName(picked.name);
+    setRecipientPhone(picked.phone);
+    setContactHint(`${picked.name} selected. Textly saved this number. When the message is due, Open WhatsApp will go directly to this chat.`);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -95,6 +93,10 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
 
     if (!message.trim()) {
       setErrorMsg('Please enter a message to schedule.');
+      return;
+    }
+    if (!recipientPhone.trim()) {
+      setErrorMsg('Please choose a WhatsApp contact first.');
       return;
     }
     if (!date || !time) {
@@ -115,7 +117,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
     onSave({
       id: editingMessage?.id,
       recipientName: recipientName.trim() || 'WhatsApp Contact',
-      recipientPhone,
+      recipientPhone: recipientPhone.trim(),
       message: message.trim(),
       scheduledAt: scheduledDate.toISOString(),
       platform,
@@ -123,7 +125,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
     });
   };
 
-  const isFormValid = message.trim().length > 0 && !!date && !!time;
+  const isFormValid = message.trim().length > 0 && recipientPhone.trim().length > 0 && !!date && !!time;
 
   return (
     <div className="pb-24 pt-4 px-4 max-w-md mx-auto min-h-screen">
@@ -145,13 +147,13 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
               <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center"><MessageSquare className="w-5 h-5" /></div>
               <div>
                 <span className="text-sm font-semibold text-slate-900 block">{recipientName === 'WhatsApp Contact' ? 'Choose WhatsApp contact' : recipientName}</span>
-                <span className="text-[11px] text-slate-500">{recipientPhone ? `Saved number: ${recipientPhone}` : 'Tap to choose a contact'}</span>
+                <span className="text-[11px] text-slate-500">{recipientPhone ? 'Number saved — will open this chat automatically' : 'Tap to choose the recipient'}</span>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400" />
           </button>
           {contactHint && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">{contactHint}</p>}
-          <p className="text-[11px] text-slate-500 px-1">On supported Android browsers, Textly uses the phone's contact picker. WhatsApp's private contact list itself is not exposed to websites.</p>
+          <p className="text-[11px] text-slate-500 px-1">Textly cannot read WhatsApp's private contact picker. We save the phone number through Android's contact picker, then use that exact number when opening WhatsApp later.</p>
         </section>
 
         <section className="space-y-2">
@@ -197,7 +199,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ onSave, onCancel
           <button type="submit" disabled={!isFormValid} className={`w-full py-4 px-6 rounded-2xl font-bold text-sm text-white shadow-md flex items-center justify-center ${isFormValid ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600/50 cursor-not-allowed'}`}>
             {editingMessage ? 'Update Scheduled Message' : 'Schedule Message'}
           </button>
-          <p className="text-[11px] text-slate-400 text-center leading-relaxed max-w-xs mx-auto">When the message is due, Textly will show its popup and notification. You then open WhatsApp and confirm the send.</p>
+          <p className="text-[11px] text-slate-400 text-center leading-relaxed max-w-xs mx-auto">When the message is due, Textly will show its popup and notification. Tap Open WhatsApp and Textly will open the saved recipient's chat with your message ready.</p>
         </div>
       </form>
 
