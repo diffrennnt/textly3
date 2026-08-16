@@ -1,4 +1,3 @@
-```tsx
 import React, { useEffect, useState } from "react";
 import type { ScheduledMessage, AppSettings, ActiveTab } from "./types";
 
@@ -705,4 +704,4 @@ export default function App() {
     </div>
   );
 }
-```
+
