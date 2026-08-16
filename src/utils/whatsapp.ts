@@ -34,12 +34,7 @@ export function buildWhatsAppNativeUrl(phone: string | undefined, message: strin
   return `whatsapp://send?text=${encodedText}`;
 }
 
-/**
- * Opens WhatsApp's recipient picker from a user click.
- * A web app cannot read WhatsApp's private contact database, so the contact
- * is selected inside WhatsApp itself. Textly keeps the recipient as
- * "WhatsApp Contact" and prepares the message when WhatsApp is opened.
- */
+/** Opens WhatsApp's recipient picker from a direct user action. */
 export function openWhatsAppContactPicker(message = ''): boolean {
   const encodedText = encodeURIComponent(message);
   const nativeUrl = `whatsapp://send?text=${encodedText}`;
@@ -51,7 +46,6 @@ export function openWhatsAppContactPicker(message = ''): boolean {
       window.location.href = nativeUrl;
       return true;
     }
-
     const win = window.open(webUrl, '_blank', 'noopener,noreferrer');
     return !!win;
   } catch {
@@ -88,6 +82,19 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 export function openWhatsApp(phone: string | undefined, message: string, defaultCountryCode = '+27'): boolean {
-  const win = window.open(buildWhatsAppWebUrl(phone, message, defaultCountryCode), '_blank', 'noopener,noreferrer');
-  return !!win;
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = isMobile
+    ? buildWhatsAppNativeUrl(phone, message, defaultCountryCode)
+    : buildWhatsAppWebUrl(phone, message, defaultCountryCode);
+
+  try {
+    if (isMobile) {
+      window.location.href = url;
+      return true;
+    }
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    return !!win;
+  } catch {
+    return false;
+  }
 }
