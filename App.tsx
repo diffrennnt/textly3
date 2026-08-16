@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from 'react';
-
-import {
-  ScheduledMessage,
-  AppSettings,
-  ActiveTab,
-} from './types';
+```tsx
+import React, { useEffect, useState } from "react";
+import type { ScheduledMessage, AppSettings, ActiveTab } from "./types";
 
 import {
   loadMessages,
@@ -12,7 +8,7 @@ import {
   loadSettings,
   saveSettings,
   INITIAL_SEED_MESSAGES,
-} from './storage';
+} from "./storage";
 
 import {
   playNotificationSound,
@@ -23,29 +19,28 @@ import {
   syncSchedulesToServiceWorker,
   markMessageAsNotified,
   clearNotifiedMessage,
-} from './notifications';
+} from "./notifications";
 
-import { calculateNextOccurrence } from './recurrence';
+import { calculateNextOccurrence } from "./recurrence";
 
-import { BottomNav } from './BottomNav';
-import { HomeScreen } from './HomeScreen';
-import { ScheduleScreen } from './ScheduleScreen';
-import { HistoryScreen } from './HistoryScreen';
-import { SettingsScreen } from './SettingsScreen';
-import { MessagePreparationModal } from './MessagePreparationModal';
-import { AndroidNotificationSim } from './AndroidNotificationSim';
+import { BottomNav } from "./BottomNav";
+import { HomeScreen } from "./HomeScreen";
+import { ScheduleScreen } from "./ScheduleScreen";
+import { HistoryScreen } from "./HistoryScreen";
+import { SettingsScreen } from "./SettingsScreen";
+import { MessagePreparationModal } from "./MessagePreparationModal";
+import { AndroidNotificationSim } from "./AndroidNotificationSim";
 
 export default function App() {
-  const [messages, setMessages] = useState<ScheduledMessage[]>(
-    () => loadMessages()
+  const [messages, setMessages] = useState<ScheduledMessage[]>(() =>
+    loadMessages()
   );
 
-  const [settings, setSettings] = useState<AppSettings>(
-    () => loadSettings()
+  const [settings, setSettings] = useState<AppSettings>(() =>
+    loadSettings()
   );
 
-  const [activeTab, setActiveTab] =
-    useState<ActiveTab>('home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>("home");
 
   const [selectedMessage, setSelectedMessage] =
     useState<ScheduledMessage | null>(null);
@@ -53,292 +48,264 @@ export default function App() {
   const [editingMessage, setEditingMessage] =
     useState<ScheduledMessage | null>(null);
 
-  const [permissionStatus, setPermissionStatus] =
-    useState<NotificationPermission | 'unsupported'>(
-      () => getNotificationPermissionStatus()
-    );
+  const [permissionStatus, setPermissionStatus] = useState<
+    NotificationPermission | "unsupported"
+  >(() => getNotificationPermissionStatus());
 
-  const [activeNotification, setActiveNotification] =
-    useState<{
-      message?: ScheduledMessage;
-      title: string;
-      body: string;
-      time: string;
-    } | null>(null);
+  const [activeNotification, setActiveNotification] = useState<{
+    message?: ScheduledMessage;
+    title: string;
+    body: string;
+    time: string;
+  } | null>(null);
 
-  // Save messages
+  /*
+   * Save messages and synchronize them with the service worker.
+   */
   useEffect(() => {
     saveMessages(messages);
     syncSchedulesToServiceWorker(messages);
   }, [messages]);
 
-  // Save settings
+  /*
+   * Save settings whenever they change.
+   */
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
 
-  // Initialize service worker
+  /*
+   * Initialize the service worker and listen for messages from it.
+   */
   useEffect(() => {
     initServiceWorker();
 
     if (
-      typeof window !== 'undefined' &&
-      'serviceWorker' in navigator
+      typeof navigator === "undefined" ||
+      !("serviceWorker" in navigator)
     ) {
-      const handleServiceWorkerMessage = (
-        event: MessageEvent
-      ) => {
-        if (
-          event.data?.type ===
-          'TEXTLY_OPEN_MESSAGE'
-        ) {
-          const msgId = event.data.messageId;
-
-          if (msgId) {
-            setMessages((current) => {
-              const found = current.find(
-                (m) => m.id === msgId
-              );
-
-              if (found) {
-                setSelectedMessage(found);
-              }
-
-              return current;
-            });
-          }
-        }
-
-        if (
-          event.data?.type ===
-          'TEXTLY_MESSAGE_DUE'
-        ) {
-          const msgId = event.data.messageId;
-
-          if (msgId) {
-            setMessages((current) =>
-              current.map((m) => {
-                if (
-                  m.id === msgId &&
-                  m.status === 'scheduled'
-                ) {
-                  return {
-                    ...m,
-                    status: 'ready' as const,
-                  };
-                }
-
-                return m;
-              })
-            );
-          }
-        }
-      };
-
-      navigator.serviceWorker.addEventListener(
-        'message',
-        handleServiceWorkerMessage
-      );
-
-      return () => {
-        navigator.serviceWorker.removeEventListener(
-          'message',
-          handleServiceWorkerMessage
-        );
-      };
-    }
-  }, []);
-
-  // Handle notification URL
-  useEffect(() => {
-    if (typeof window === 'undefined') {
       return;
     }
 
-    const params = new URLSearchParams(
-      window.location.search
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const data = event.data;
+
+      if (!data) return;
+
+      if (data.type === "TEXTLY_OPEN_MESSAGE" && data.messageId) {
+        setMessages((current) => {
+          const found = current.find(
+            (message) => message.id === data.messageId
+          );
+
+          if (found) {
+            setSelectedMessage(found);
+          }
+
+          return current;
+        });
+      }
+
+      if (data.type === "TEXTLY_MESSAGE_DUE" && data.messageId) {
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === data.messageId &&
+            message.status === "scheduled"
+              ? {
+                  ...message,
+                  status: "ready",
+                }
+              : message
+          )
+        );
+      }
+    };
+
+    navigator.serviceWorker.addEventListener(
+      "message",
+      handleServiceWorkerMessage
     );
 
-    const openMsgId =
-      params.get('openMsgId');
-
-    if (openMsgId) {
-      const found = messages.find(
-        (m) => m.id === openMsgId
+    return () => {
+      navigator.serviceWorker.removeEventListener(
+        "message",
+        handleServiceWorkerMessage
       );
+    };
+  }, []);
 
-      if (found) {
-        setSelectedMessage(found);
-      }
+  /*
+   * Open a message directly from a notification URL.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-      try {
-        window.history.replaceState(
-          {},
-          '',
-          window.location.pathname
-        );
-      } catch {
-        // Ignore
-      }
+    const params = new URLSearchParams(window.location.search);
+    const openMessageId = params.get("openMsgId");
+
+    if (!openMessageId) return;
+
+    const found = messages.find(
+      (message) => message.id === openMessageId
+    );
+
+    if (found) {
+      setSelectedMessage(found);
+    }
+
+    try {
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+    } catch {
+      // Ignore URL cleanup errors.
     }
   }, [messages]);
 
-  // Check scheduled messages
+  /*
+   * Foreground scheduler.
+   *
+   * This checks scheduled messages periodically while the web app
+   * is open. The service worker handles background notification work.
+   */
   useEffect(() => {
     const evaluateDueMessages = () => {
       const now = Date.now();
 
-      setMessages((prevMessages) => {
-        let hasChanges = false;
+      setMessages((previousMessages) => {
+        let changed = false;
 
-        const updated =
-          prevMessages.map((msg) => {
-            if (
-              msg.status === 'scheduled' &&
-              !msg.isPaused
-            ) {
-              const scheduledTime =
-                new Date(
-                  msg.scheduledAt
-                ).getTime();
+        const updatedMessages = previousMessages.map((message) => {
+          if (
+            message.status !== "scheduled" ||
+            message.isPaused
+          ) {
+            return message;
+          }
 
-              if (scheduledTime <= now) {
-                hasChanges = true;
+          const scheduledTime = new Date(
+            message.scheduledAt
+          ).getTime();
 
-                const isFirstAlert =
-                  markMessageAsNotified(
-                    msg.id
-                  );
+          if (
+            Number.isNaN(scheduledTime) ||
+            scheduledTime > now
+          ) {
+            return message;
+          }
 
-                if (isFirstAlert) {
-                  if (
-                    settings.soundEnabled
-                  ) {
-                    playNotificationSound();
-                  }
+          changed = true;
 
-                  const title =
-                    'Textly — Message Ready';
+          const firstAlert = markMessageAsNotified(message.id);
 
-                  const body =
-                    'Your scheduled message is ready to send.';
+          if (firstAlert) {
+            const title = "Textly — Message Ready";
+            const body = "Your scheduled message is ready to send.";
 
-                  sendBrowserNotification(
-                    title,
-                    body,
-                    {
-                      messageId: msg.id,
-                      recipientName:
-                        msg.recipientName,
-                      messageText:
-                        msg.message,
-                    },
-                    () => {
-                      setSelectedMessage({
-                        ...msg,
-                        status: 'ready',
-                      });
-                    }
-                  );
-
-                  if (
-                    settings.simulateAndroidDrawer
-                  ) {
-                    setActiveNotification({
-                      message: {
-                        ...msg,
-                        status: 'ready',
-                      },
-                      title,
-                      body,
-                      time: 'Just now',
-                    });
-                  }
-                }
-
-                // Recurring message
-                if (
-                  msg.repeat &&
-                  msg.repeat !== 'never'
-                ) {
-                  const nextTime =
-                    calculateNextOccurrence(
-                      msg.scheduledAt,
-                      msg.repeat,
-                      now
-                    );
-
-                  return {
-                    ...msg,
-                    scheduledAt: nextTime,
-                    status:
-                      'scheduled' as const,
-                  };
-                }
-
-                return {
-                  ...msg,
-                  status:
-                    'ready' as const,
-                };
-              }
+            if (settings.soundEnabled) {
+              playNotificationSound();
             }
 
-            return msg;
-          });
+            sendBrowserNotification(
+              title,
+              body,
+              {
+                messageId: message.id,
+                recipientName: message.recipientName,
+                messageText: message.message,
+              },
+              () => {
+                setSelectedMessage({
+                  ...message,
+                  status: "ready",
+                });
+              }
+            );
 
-        return hasChanges
-          ? updated
-          : prevMessages;
+            if (settings.simulateAndroidDrawer) {
+              setActiveNotification({
+                message: {
+                  ...message,
+                  status: "ready",
+                },
+                title,
+                body,
+                time: "Just now",
+              });
+            }
+          }
+
+          if (
+            message.repeat &&
+            message.repeat !== "never"
+          ) {
+            const nextTime = calculateNextOccurrence(
+              message.scheduledAt,
+              message.repeat,
+              now
+            );
+
+            return {
+              ...message,
+              scheduledAt: nextTime,
+              status: "scheduled",
+            };
+          }
+
+          return {
+            ...message,
+            status: "ready",
+          };
+        });
+
+        return changed ? updatedMessages : previousMessages;
       });
     };
 
-    const interval =
-      setInterval(
-        evaluateDueMessages,
-        2500
-      );
+    const interval = window.setInterval(
+      evaluateDueMessages,
+      2500
+    );
 
-    const handleVisibility = () => {
-      if (
-        document.visibilityState ===
-        'visible'
-      ) {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
         evaluateDueMessages();
       }
     };
 
     document.addEventListener(
-      'visibilitychange',
-      handleVisibility
+      "visibilitychange",
+      handleVisibilityOrFocus
     );
 
     window.addEventListener(
-      'focus',
-      handleVisibility
+      "focus",
+      handleVisibilityOrFocus
     );
 
     window.addEventListener(
-      'pageshow',
-      handleVisibility
+      "pageshow",
+      handleVisibilityOrFocus
     );
 
     return () => {
-      clearInterval(interval);
+      window.clearInterval(interval);
 
       document.removeEventListener(
-        'visibilitychange',
-        handleVisibility
+        "visibilitychange",
+        handleVisibilityOrFocus
       );
 
       window.removeEventListener(
-        'focus',
-        handleVisibility
+        "focus",
+        handleVisibilityOrFocus
       );
 
       window.removeEventListener(
-        'pageshow',
-        handleVisibility
+        "pageshow",
+        handleVisibilityOrFocus
       );
     };
   }, [
@@ -346,240 +313,210 @@ export default function App() {
     settings.simulateAndroidDrawer,
   ]);
 
-  // Notification permission
-  const handleRequestPermission =
-    async () => {
-      const status =
-        await requestNotificationPermission();
+  /*
+   * Request browser notification permission.
+   */
+  const handleRequestPermission = async () => {
+    const status = await requestNotificationPermission();
 
-      setPermissionStatus(status);
+    setPermissionStatus(status);
 
-      return status;
-    };
+    return status;
+  };
 
-  // Create or edit message
+  /*
+   * Create or edit a scheduled message.
+   */
   const handleSaveMessage = (
     data: Omit<
       ScheduledMessage,
-      'id' | 'createdAt' | 'status'
+      "id" | "createdAt" | "status"
     > & {
       id?: string;
     }
   ) => {
     if (data.id) {
-      clearNotifiedMessage(
-        data.id
-      );
+      clearNotifiedMessage(data.id);
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === data.id
+      setMessages((previousMessages) =>
+        previousMessages.map((message) =>
+          message.id === data.id
             ? {
-                ...m,
-                recipientName:
-                  data.recipientName,
-                recipientPhone:
-                  data.recipientPhone,
-                message:
-                  data.message,
-                scheduledAt:
-                  data.scheduledAt,
-                repeat:
-                  data.repeat ||
-                  'never',
-                status:
-                  'scheduled',
+                ...message,
+                recipientName: data.recipientName,
+                recipientPhone: data.recipientPhone,
+                message: data.message,
+                scheduledAt: data.scheduledAt,
+                repeat: data.repeat || "never",
+                status: "scheduled",
                 isPaused: false,
               }
-            : m
+            : message
         )
       );
     } else {
-      const newMessage: ScheduledMessage =
-        {
-          id: `msg-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 7)}`,
+      const newMessage: ScheduledMessage = {
+        id: `msg-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}`,
 
-          recipientName:
-            data.recipientName,
+        recipientName: data.recipientName,
+        recipientPhone: data.recipientPhone,
+        message: data.message,
+        scheduledAt: data.scheduledAt,
+        createdAt: new Date().toISOString(),
+        status: "scheduled",
+        platform: "whatsapp",
+        repeat: data.repeat || "never",
+        isPaused: false,
+      };
 
-          recipientPhone:
-            data.recipientPhone,
-
-          message:
-            data.message,
-
-          scheduledAt:
-            data.scheduledAt,
-
-          createdAt:
-            new Date().toISOString(),
-
-          status:
-            'scheduled',
-
-          platform:
-            'whatsapp',
-
-          repeat:
-            data.repeat ||
-            'never',
-
-          isPaused: false,
-        };
-
-      setMessages((prev) => [
+      setMessages((previousMessages) => [
         newMessage,
-        ...prev,
+        ...previousMessages,
       ]);
     }
 
     setEditingMessage(null);
-    setActiveTab('home');
+    setActiveTab("home");
   };
 
-  // Pause / resume
-  const handleTogglePauseMessage =
-    (msgId: string) => {
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== msgId) {
-            return m;
-          }
+  /*
+   * Pause or resume a recurring message.
+   */
+  const handleTogglePauseMessage = (messageId: string) => {
+    setMessages((previousMessages) =>
+      previousMessages.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
 
-          const willPause =
-            !m.isPaused;
+        const willPause = !message.isPaused;
 
-          if (
-            !willPause &&
-            m.repeat &&
-            m.repeat !== 'never'
-          ) {
-            const nextTime =
-              calculateNextOccurrence(
-                m.scheduledAt,
-                m.repeat,
-                Date.now()
-              );
-
-            return {
-              ...m,
-              isPaused: false,
-              scheduledAt:
-                nextTime,
-            };
-          }
+        if (
+          !willPause &&
+          message.repeat &&
+          message.repeat !== "never"
+        ) {
+          const nextTime = calculateNextOccurrence(
+            message.scheduledAt,
+            message.repeat,
+            Date.now()
+          );
 
           return {
-            ...m,
-            isPaused: willPause,
+            ...message,
+            isPaused: false,
+            scheduledAt: nextTime,
+            status: "scheduled",
           };
-        })
-      );
-    };
+        }
 
-  // Delete
-  const handleDeleteMessage =
-    (msgId: string) => {
-      clearNotifiedMessage(
-        msgId
-      );
+        return {
+          ...message,
+          isPaused: willPause,
+        };
+      })
+    );
+  };
 
-      setMessages((prev) =>
-        prev.filter(
-          (m) => m.id !== msgId
-        )
-      );
-    };
+  /*
+   * Delete a message.
+   */
+  const handleDeleteMessage = (messageId: string) => {
+    clearNotifiedMessage(messageId);
 
-  // Cancel
-  const handleCancelMessage =
-    (msgId: string) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId
-            ? {
-                ...m,
-                status:
-                  'cancelled',
-              }
-            : m
-        )
-      );
-    };
+    setMessages((previousMessages) =>
+      previousMessages.filter(
+        (message) => message.id !== messageId
+      )
+    );
+  };
 
-  // Mark sent
-  const handleMarkAsSent =
-    (msgId: string) => {
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== msgId) {
-            return m;
-          }
+  /*
+   * Cancel a scheduled message.
+   */
+  const handleCancelMessage = (messageId: string) => {
+    setMessages((previousMessages) =>
+      previousMessages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              status: "cancelled",
+            }
+          : message
+      )
+    );
+  };
 
-          if (
-            m.repeat &&
-            m.repeat !== 'never'
-          ) {
-            const nextTime =
-              calculateNextOccurrence(
-                m.scheduledAt,
-                m.repeat,
-                Date.now()
-              );
+  /*
+   * Mark a message as manually sent.
+   */
+  const handleMarkAsSent = (messageId: string) => {
+    setMessages((previousMessages) =>
+      previousMessages.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
 
-            return {
-              ...m,
-              scheduledAt:
-                nextTime,
-              status:
-                'scheduled' as const,
-              sentAt:
-                new Date().toISOString(),
-            };
-          }
+        const sentAt = new Date().toISOString();
+
+        if (
+          message.repeat &&
+          message.repeat !== "never"
+        ) {
+          const nextTime = calculateNextOccurrence(
+            message.scheduledAt,
+            message.repeat,
+            Date.now()
+          );
 
           return {
-            ...m,
-            status:
-              'sent_manually' as const,
-            sentAt:
-              new Date().toISOString(),
+            ...message,
+            scheduledAt: nextTime,
+            status: "scheduled",
+            sentAt,
           };
-        })
-      );
-    };
+        }
 
-  // Reschedule
-  const handleReschedule =
-    (msg: ScheduledMessage) => {
-      setEditingMessage({
-        ...msg,
-        scheduledAt:
-          new Date(
-            Date.now() +
-              15 * 60 * 1000
-          ).toISOString(),
-      });
+        return {
+          ...message,
+          status: "sent_manually",
+          sentAt,
+        };
+      })
+    );
+  };
 
-      setActiveTab('schedule');
-    };
+  /*
+   * Reschedule a message.
+   */
+  const handleReschedule = (
+    message: ScheduledMessage
+  ) => {
+    setEditingMessage({
+      ...message,
+      scheduledAt: new Date(
+        Date.now() + 15 * 60 * 1000
+      ).toISOString(),
+    });
 
-  // Test notification
+    setActiveTab("schedule");
+  };
+
+  /*
+   * Test notification.
+   */
   const handleTriggerTestNotification =
     async (): Promise<{
       success: boolean;
       reason?: string;
     }> => {
-      if (
-        permissionStatus !==
-        'granted'
-      ) {
+      if (permissionStatus !== "granted") {
         return {
           success: false,
           reason:
-            'Notification permission is blocked in your browser. Allow notifications in site settings.',
+            "Notification permission is blocked in your browser. Allow notifications in your site settings.",
         };
       }
 
@@ -587,32 +524,26 @@ export default function App() {
         playNotificationSound();
       }
 
-      const title =
-        'Textly — Test Notification';
+      const title = "Textly — Test Notification";
+      const body = "Notifications are working correctly!";
 
-      const body =
-        'Notifications are working correctly!';
+      const sent = await sendBrowserNotification(
+        title,
+        body,
+        {
+          messageText:
+            "Test notification from Textly",
+        },
+        () => {
+          window.focus();
+        }
+      );
 
-      const sent =
-        await sendBrowserNotification(
-          title,
-          body,
-          {
-            messageText:
-              'Test notification from Textly',
-          },
-          () => {
-            window.focus();
-          }
-        );
-
-      if (
-        settings.simulateAndroidDrawer
-      ) {
+      if (settings.simulateAndroidDrawer) {
         setActiveNotification({
           title,
           body,
-          time: 'Just now',
+          time: "Just now",
         });
       }
 
@@ -621,241 +552,138 @@ export default function App() {
       };
     };
 
-  // Reset sample data
+  /*
+   * Reset sample data.
+   */
   const handleResetData = () => {
-    setMessages(
-      INITIAL_SEED_MESSAGES
-    );
-
-    saveMessages(
-      INITIAL_SEED_MESSAGES
-    );
+    setMessages(INITIAL_SEED_MESSAGES);
+    saveMessages(INITIAL_SEED_MESSAGES);
   };
 
-  const scheduledCount =
-    messages.filter(
-      (m) =>
-        m.status ===
-        'scheduled'
-    ).length;
+  const scheduledCount = messages.filter(
+    (message) => message.status === "scheduled"
+  ).length;
 
-  const readyCount =
-    messages.filter(
-      (m) =>
-        m.status ===
-        'ready'
-    ).length;
+  const readyCount = messages.filter(
+    (message) => message.status === "ready"
+  ).length;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-between">
-
       <AndroidNotificationSim
-        notification={
-          activeNotification
-        }
+        notification={activeNotification}
         onDismiss={() =>
-          setActiveNotification(
-            null
-          )
+          setActiveNotification(null)
         }
-        onOpenMessage={(msg) =>
-          setSelectedMessage(
-            msg
-          )
+        onOpenMessage={(message) =>
+          setSelectedMessage(message)
         }
       />
 
       <main className="flex-1 w-full max-w-md mx-auto bg-slate-50 border-x border-slate-200/80 min-h-screen shadow-sm">
-
-        {activeTab === 'home' && (
+        {activeTab === "home" && (
           <HomeScreen
             messages={messages}
-
             onScheduleClick={() => {
-              setEditingMessage(
-                null
-              );
-              setActiveTab(
-                'schedule'
-              );
+              setEditingMessage(null);
+              setActiveTab("schedule");
             }}
-
-            onOpenMessage={(msg) =>
-              setSelectedMessage(
-                msg
-              )
+            onOpenMessage={(message) =>
+              setSelectedMessage(message)
             }
-
-            onEditMessage={(msg) => {
-              setEditingMessage(
-                msg
-              );
-              setActiveTab(
-                'schedule'
-              );
+            onEditMessage={(message) => {
+              setEditingMessage(message);
+              setActiveTab("schedule");
             }}
-
-            onDeleteMessage={
-              handleDeleteMessage
-            }
-
-            onCancelMessage={
-              handleCancelMessage
-            }
-
+            onDeleteMessage={handleDeleteMessage}
+            onCancelMessage={handleCancelMessage}
             onTogglePauseMessage={
               handleTogglePauseMessage
             }
-
             onTriggerTestNotification={
               handleTriggerTestNotification
             }
-
-            permissionStatus={
-              permissionStatus
-            }
-
+            permissionStatus={permissionStatus}
             onRequestPermission={
               handleRequestPermission
             }
-
             onViewAllClick={() =>
-              setActiveTab(
-                'history'
-              )
+              setActiveTab("history")
             }
-
             onOpenSettings={() =>
-              setActiveTab(
-                'settings'
-              )
+              setActiveTab("settings")
             }
           />
         )}
 
-        {activeTab === 'schedule' && (
+        {activeTab === "schedule" && (
           <ScheduleScreen
-            onSave={
-              handleSaveMessage
-            }
-
+            onSave={handleSaveMessage}
             onCancel={() => {
-              setEditingMessage(
-                null
-              );
-              setActiveTab(
-                'home'
-              );
+              setEditingMessage(null);
+              setActiveTab("home");
             }}
-
-            editingMessage={
-              editingMessage
-            }
-
+            editingMessage={editingMessage}
             defaultCountryCode={
               settings.defaultCountryCode
             }
           />
         )}
 
-        {activeTab === 'history' && (
+        {activeTab === "history" && (
           <HistoryScreen
             messages={messages}
-
-            onOpenMessage={(msg) =>
-              setSelectedMessage(
-                msg
-              )
+            onOpenMessage={(message) =>
+              setSelectedMessage(message)
             }
-
-            onReschedule={
-              handleReschedule
-            }
-
+            onReschedule={handleReschedule}
             onClearHistory={() =>
-              setMessages((prev) =>
-                prev.filter(
-                  (m) =>
-                    m.status ===
-                    'scheduled'
+              setMessages((previousMessages) =>
+                previousMessages.filter(
+                  (message) =>
+                    message.status === "scheduled"
                 )
               )
             }
-
-            onDeleteMessage={
-              handleDeleteMessage
-            }
+            onDeleteMessage={handleDeleteMessage}
           />
         )}
 
-        {activeTab === 'settings' && (
+        {activeTab === "settings" && (
           <SettingsScreen
             settings={settings}
-
-            onUpdateSettings={(
-              newSettings
-            ) =>
-              setSettings(
-                (prev) => ({
-                  ...prev,
-                  ...newSettings,
-                })
-              )
+            onUpdateSettings={(newSettings) =>
+              setSettings((previousSettings) => ({
+                ...previousSettings,
+                ...newSettings,
+              }))
             }
-
-            permissionStatus={
-              permissionStatus
-            }
-
+            permissionStatus={permissionStatus}
             onRequestPermission={
               handleRequestPermission
             }
-
             onTriggerTestNotification={
               handleTriggerTestNotification
             }
-
-            onResetData={
-              handleResetData
-            }
+            onResetData={handleResetData}
           />
         )}
-
       </main>
 
       {selectedMessage && (
         <MessagePreparationModal
-          message={
-            selectedMessage
-          }
-
+          message={selectedMessage}
           onClose={() =>
-            setSelectedMessage(
-              null
-            )
+            setSelectedMessage(null)
           }
-
-          onMarkAsSent={
-            handleMarkAsSent
-          }
-
-          onDelete={
-            handleDeleteMessage
-          }
-
-          onEdit={(msg) => {
-            setEditingMessage(
-              msg
-            );
-            setActiveTab(
-              'schedule'
-            );
+          onMarkAsSent={handleMarkAsSent}
+          onDelete={handleDeleteMessage}
+          onEdit={(message) => {
+            setSelectedMessage(null);
+            setEditingMessage(message);
+            setActiveTab("schedule");
           }}
-
-          onCancel={
-            handleCancelMessage
-          }
-
+          onCancel={handleCancelMessage}
           defaultCountryCode={
             settings.defaultCountryCode
           }
@@ -863,31 +691,18 @@ export default function App() {
       )}
 
       <BottomNav
-        activeTab={
-          activeTab
-        }
-
+        activeTab={activeTab}
         setActiveTab={(tab) => {
-          if (
-            tab === 'schedule'
-          ) {
-            setEditingMessage(
-              null
-            );
+          if (tab === "schedule") {
+            setEditingMessage(null);
           }
 
           setActiveTab(tab);
         }}
-
-        scheduledCount={
-          scheduledCount
-        }
-
-        readyCount={
-          readyCount
-        }
+        scheduledCount={scheduledCount}
+        readyCount={readyCount}
       />
-
     </div>
   );
 }
+```
