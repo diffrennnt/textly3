@@ -3,23 +3,16 @@ import { ScheduledMessage } from '../types';
 let swRegistration: ServiceWorkerRegistration | null = null;
 const notifiedMessageIds = new Set<string>();
 
-/**
- * Registers the Textly Service Worker for Android/PWA notifications.
- */
 export async function initServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    return null;
-  }
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
       updateViaCache: 'none',
     });
-
     swRegistration = registration;
     await registration.update().catch(() => {});
-
     return registration;
   } catch (err) {
     console.warn('Service worker registration failed:', err);
@@ -27,57 +20,41 @@ export async function initServiceWorker(): Promise<ServiceWorkerRegistration | n
   }
 }
 
-/**
- * Sync active scheduled alarms to the Service Worker.
- */
+/** Sends all active schedules, including recipient and repeat data, to the background worker. */
 export function syncSchedulesToServiceWorker(schedules: ScheduledMessage[]): void {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    return;
-  }
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
   const activeSchedules = schedules
     .filter((m) => m.status === 'scheduled' && !m.isPaused)
     .map((m) => ({
       id: m.id,
       recipientName: m.recipientName,
+      recipientPhone: m.recipientPhone,
       message: m.message,
       scheduledAt: m.scheduledAt,
-      isPaused: m.isPaused,
+      repeat: m.repeat || 'never',
+      isPaused: !!m.isPaused,
       status: m.status,
     }));
 
-  const send = (registration: ServiceWorkerRegistration) => {
-    registration.active?.postMessage({
-      type: 'SYNC_SCHEDULES',
-      schedules: activeSchedules,
-    });
+  const post = (registration: ServiceWorkerRegistration) => {
+    registration.active?.postMessage({ type: 'SYNC_SCHEDULES', schedules: activeSchedules });
   };
 
   if (navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({
-      type: 'SYNC_SCHEDULES',
-      schedules: activeSchedules,
-    });
+    navigator.serviceWorker.controller.postMessage({ type: 'SYNC_SCHEDULES', schedules: activeSchedules });
   } else {
-    navigator.serviceWorker.ready.then(send).catch(() => {});
+    navigator.serviceWorker.ready.then(post).catch(() => {});
   }
 }
 
-/**
- * Plays a pleasant Web Audio API notification chime.
- */
 export function playNotificationSound(): void {
   try {
-    const AudioContextClass =
-      window.AudioContext ||
+    const AudioContextClass = window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
-
     const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
-
+    if (ctx.state === 'suspended') ctx.resume();
     const now = ctx.currentTime;
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
@@ -105,36 +82,22 @@ export function playNotificationSound(): void {
   }
 }
 
-/**
- * Triggers hardware vibration on supported Android devices.
- */
 export function triggerHapticVibration(): void {
   try {
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200, 100, 200]);
-    }
-  } catch {
-    // Vibration is not supported or is blocked by the browser.
-  }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 200]);
+  } catch {}
 }
 
 export function getNotificationPermissionStatus(): NotificationPermission | 'unsupported' {
-  if (typeof window === 'undefined' || !('Notification' in window)) {
-    return 'unsupported';
-  }
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
   return Notification.permission;
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
-  if (typeof window === 'undefined' || !('Notification' in window)) {
-    return 'unsupported';
-  }
-
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
   try {
     const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      await initServiceWorker();
-    }
+    if (permission === 'granted') await initServiceWorker();
     return permission;
   } catch (err) {
     console.error('Error requesting notification permission:', err);
@@ -146,13 +109,12 @@ export interface NotificationPayloadData {
   messageId?: string;
   recipientName?: string;
   messageText?: string;
+  recipientPhone?: string;
   [key: string]: unknown;
 }
 
 export function markMessageAsNotified(messageId: string): boolean {
-  if (notifiedMessageIds.has(messageId)) {
-    return false;
-  }
+  if (notifiedMessageIds.has(messageId)) return false;
   notifiedMessageIds.add(messageId);
   return true;
 }
@@ -161,31 +123,17 @@ export function clearNotifiedMessage(messageId: string): void {
   notifiedMessageIds.delete(messageId);
 }
 
-/**
- * Sends a real OS-level notification through the Service Worker first.
- * Android/Chrome decides the final heads-up/pop-up presentation from the
- * user's notification-channel/system settings; the web app cannot force it.
- */
 export async function sendBrowserNotification(
   title: string,
   body: string,
   data?: NotificationPayloadData,
   onClick?: () => void
 ): Promise<boolean> {
-  if (typeof window === 'undefined' || !('Notification' in window)) {
-    return false;
-  }
-
-  if (Notification.permission !== 'granted') {
-    return false;
-  }
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
 
   triggerHapticVibration();
-
-  const tag = data?.messageId
-    ? `textly-msg-${data.messageId}`
-    : `textly-alert-${Date.now()}`;
-
+  const tag = data?.messageId ? `textly-msg-${data.messageId}` : `textly-alert-${Date.now()}`;
   const notificationOptions: NotificationOptions & Record<string, unknown> = {
     body,
     icon: '/icon.svg',
@@ -199,17 +147,10 @@ export async function sendBrowserNotification(
     lang: 'en-US',
     data: {
       ...data,
-      url: data?.messageId
-        ? `/?openMsgId=${encodeURIComponent(data.messageId)}`
-        : '/',
+      url: data?.messageId ? `/?openMsgId=${encodeURIComponent(data.messageId)}` : '/',
     },
     vibrate: [200, 100, 200, 100, 200],
-    actions: [
-      {
-        action: 'open_whatsapp',
-        title: 'Open in WhatsApp',
-      },
-    ],
+    actions: [{ action: 'open_whatsapp', title: 'Open in WhatsApp' }],
   };
 
   if ('serviceWorker' in navigator) {
@@ -226,7 +167,6 @@ export async function sendBrowserNotification(
 
   try {
     const notif = new Notification(title, notificationOptions);
-
     if (onClick) {
       notif.onclick = () => {
         window.focus();
@@ -234,7 +174,6 @@ export async function sendBrowserNotification(
         notif.close();
       };
     }
-
     return true;
   } catch (err) {
     console.warn('Direct Notification constructor failed:', err);
@@ -251,25 +190,15 @@ export function formatScheduledDateTime(dateString: string): {
   const target = new Date(dateString);
   const now = new Date();
   const isPast = target.getTime() <= now.getTime();
-
   const dateFormatted = target.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
+    weekday: 'short', month: 'short', day: 'numeric',
     year: target.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
   });
-
-  const timeFormatted = target.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-
+  const timeFormatted = target.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
   const diffMs = target.getTime() - now.getTime();
-  const diffMins = Math.round(diffMs / (60 * 1000));
-  const diffHours = Math.round(diffMs / (3600 * 1000));
-  const diffDays = Math.round(diffMs / (24 * 3600 * 1000));
-
+  const diffMins = Math.round(diffMs / 60000);
+  const diffHours = Math.round(diffMs / 3600000);
+  const diffDays = Math.round(diffMs / 86400000);
   let relative = '';
   if (isPast) {
     if (Math.abs(diffMins) < 1) relative = 'Due now';
@@ -282,6 +211,5 @@ export function formatScheduledDateTime(dateString: string): {
     else if (diffHours < 24) relative = `In ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
     else relative = `In ${diffDays} day${diffDays > 1 ? 's' : ''}`;
   }
-
   return { dateFormatted, timeFormatted, relative, isPast };
 }
