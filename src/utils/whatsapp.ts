@@ -1,5 +1,5 @@
 /** Formats a phone number for WhatsApp links. */
-export function normalizePhoneNumber(phone: string, defaultCountryCode = '+1'): string {
+export function normalizePhoneNumber(phone: string, defaultCountryCode = '+27'): string {
   if (!phone || phone === 'WhatsApp Contact') return '';
   let cleaned = phone.trim().replace(/[^\d+]/g, '');
   if (!cleaned.startsWith('+')) {
@@ -16,7 +16,7 @@ export function formatPhoneDisplay(phone: string): string {
   return trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
 }
 
-export function buildWhatsAppWebUrl(phone: string | undefined, message: string, defaultCountryCode = '+1'): string {
+export function buildWhatsAppWebUrl(phone: string | undefined, message: string, defaultCountryCode = '+27'): string {
   const encodedText = encodeURIComponent(message);
   if (phone && phone.trim() && phone !== 'WhatsApp Contact') {
     const cleanPhone = normalizePhoneNumber(phone, defaultCountryCode);
@@ -25,13 +25,43 @@ export function buildWhatsAppWebUrl(phone: string | undefined, message: string, 
   return `https://wa.me/?text=${encodedText}`;
 }
 
-export function buildWhatsAppNativeUrl(phone: string | undefined, message: string, defaultCountryCode = '+1'): string {
+export function buildWhatsAppNativeUrl(phone: string | undefined, message: string, defaultCountryCode = '+27'): string {
   const encodedText = encodeURIComponent(message);
   if (phone && phone.trim() && phone !== 'WhatsApp Contact') {
     const cleanPhone = normalizePhoneNumber(phone, defaultCountryCode);
     if (cleanPhone) return `whatsapp://send?phone=${cleanPhone}&text=${encodedText}`;
   }
   return `whatsapp://send?text=${encodedText}`;
+}
+
+/**
+ * Opens WhatsApp's recipient picker from a user click.
+ * A web app cannot read WhatsApp's private contact database, so the contact
+ * is selected inside WhatsApp itself. Textly keeps the recipient as
+ * "WhatsApp Contact" and prepares the message when WhatsApp is opened.
+ */
+export function openWhatsAppContactPicker(message = ''): boolean {
+  const encodedText = encodeURIComponent(message);
+  const nativeUrl = `whatsapp://send?text=${encodedText}`;
+  const webUrl = `https://wa.me/?text=${encodedText}`;
+
+  try {
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = nativeUrl;
+      return true;
+    }
+
+    const win = window.open(webUrl, '_blank', 'noopener,noreferrer');
+    return !!win;
+  } catch {
+    try {
+      window.open(webUrl, '_blank', 'noopener,noreferrer');
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -57,7 +87,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function openWhatsApp(phone: string | undefined, message: string, defaultCountryCode = '+1'): boolean {
+export function openWhatsApp(phone: string | undefined, message: string, defaultCountryCode = '+27'): boolean {
   const win = window.open(buildWhatsAppWebUrl(phone, message, defaultCountryCode), '_blank', 'noopener,noreferrer');
   return !!win;
 }
