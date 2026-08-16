@@ -8,7 +8,6 @@ import {
   VolumeX,
   Smartphone,
   Check,
-  Globe,
   Info,
   ChevronRight,
   Zap,
@@ -24,19 +23,6 @@ interface SettingsScreenProps {
   onTriggerTestNotification: () => Promise<{ success: boolean; reason?: string }> | void;
   onResetData: () => void;
 }
-
-const COUNTRY_CODES = [
-  { code: '+1', name: 'United States / Canada (+1)' },
-  { code: '+44', name: 'United Kingdom (+44)' },
-  { code: '+91', name: 'India (+91)' },
-  { code: '+49', name: 'Germany (+49)' },
-  { code: '+33', name: 'France (+33)' },
-  { code: '+61', name: 'Australia (+61)' },
-  { code: '+81', name: 'Japan (+81)' },
-  { code: '+55', name: 'Brazil (+55)' },
-  { code: '+52', name: 'Mexico (+52)' },
-  { code: '+34', name: 'Spain (+34)' },
-];
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
@@ -110,7 +96,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   return (
     <div className="pb-28 pt-4 px-4 max-w-md mx-auto space-y-4">
-      {/* Title */}
       <div>
         <h1 className="text-xl font-extrabold text-slate-900">Settings</h1>
         <p className="text-xs text-slate-500 mt-0.5">Preferences & Notification Architecture</p>
@@ -120,137 +105,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
-                isGranted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {isGranted ? (
-                <Bell className="w-5 h-5 text-emerald-700" />
-              ) : (
-                <BellOff className="w-5 h-5 text-amber-700" />
-              )}
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${isGranted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              {isGranted ? <Bell className="w-5 h-5 text-emerald-700" /> : <BellOff className="w-5 h-5 text-amber-700" />}
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-900">Notifications</h3>
-              <p className="text-xs text-slate-500">
-                Status:{' '}
-                <span className={`font-semibold ${isGranted ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {isGranted ? 'Enabled' : 'Blocked'}
-                </span>
-              </p>
+              <p className="text-xs text-slate-500">Status:{' '}<span className={`font-semibold ${isGranted ? 'text-emerald-700' : 'text-amber-700'}`}>{isGranted ? 'Enabled' : 'Blocked'}</span></p>
             </div>
           </div>
-
-          {/* Enabled / Blocked Badge */}
           {isGranted ? (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full">
-              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-              Enabled
-            </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full"><Check className="w-3.5 h-3.5 stroke-[2.5]" />Enabled</span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-xs rounded-full">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Blocked
-            </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 font-bold text-xs rounded-full"><AlertCircle className="w-3.5 h-3.5" />Blocked</span>
           )}
         </div>
 
-        {/* Action Buttons: [Test Notification] & [Enable Notifications] */}
         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleTestNotification}
-            className="flex-1 py-2.5 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            <span>Test Notification</span>
+          <button type="button" onClick={handleTestNotification} className="flex-1 py-2.5 px-3.5 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /><span>Test Notification</span>
           </button>
-
           {!isGranted && (
-            <button
-              type="button"
-              onClick={handleEnableNotifications}
-              className="flex-1 py-2.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Bell className="w-3.5 h-3.5" />
-              <span>Enable Notifications</span>
+            <button type="button" onClick={handleEnableNotifications} className="flex-1 py-2.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+              <Bell className="w-3.5 h-3.5" /><span>Enable Notifications</span>
             </button>
           )}
         </div>
 
-        {/* Test Alert Status Feedback */}
         {testStatusMsg && (
-          <div
-            className={`p-3 rounded-xl text-xs font-medium border flex items-start gap-2 animate-in fade-in duration-150 ${
-              testStatusMsg.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-amber-50 border-amber-200 text-amber-900'
-            }`}
-          >
-            {testStatusMsg.type === 'success' ? (
-              <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            )}
+          <div className={`p-3 rounded-xl text-xs font-medium border flex items-start gap-2 animate-in fade-in duration-150 ${testStatusMsg.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+            {testStatusMsg.type === 'success' ? <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />}
             <span className="leading-snug">{testStatusMsg.text}</span>
           </div>
         )}
       </div>
 
-      {/* 2. Audio & Preferences */}
+      {/* 2. Preferences */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-          Preferences
-        </h3>
+        <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Preferences</h3>
 
-        {/* Sound Toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {settings.soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-slate-400" />
-            )}
+            {settings.soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-600" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
             <div>
               <p className="font-bold text-xs text-slate-900">Notification Sound Chime</p>
               <p className="text-[11px] text-slate-500">Play chime when message is ready</p>
             </div>
           </div>
-          <button
-            onClick={() => onUpdateSettings({ soundEnabled: !settings.soundEnabled })}
-            className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-              settings.soundEnabled ? 'bg-emerald-600' : 'bg-slate-300'
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                settings.soundEnabled ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
+          <button onClick={() => onUpdateSettings({ soundEnabled: !settings.soundEnabled })} className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${settings.soundEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+            <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${settings.soundEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
           </button>
-        </div>
-
-        {/* Default Country Code */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Globe className="w-4 h-4 text-slate-500" />
-            <div>
-              <p className="font-bold text-xs text-slate-900">Default Country Code</p>
-              <p className="text-[11px] text-slate-500">Auto-applied for raw phone entries</p>
-            </div>
-          </div>
-          <select
-            value={settings.defaultCountryCode}
-            onChange={(e) => onUpdateSettings({ defaultCountryCode: e.target.value })}
-            className="px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            {COUNTRY_CODES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code}
-              </option>
-            ))}
-          </select>
         </div>
 
         {/* In-App Android Notification Drawer Simulation */}
@@ -262,67 +165,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <p className="text-[11px] text-slate-500">Show top notification bar preview in UI</p>
             </div>
           </div>
-          <button
-            onClick={() => onUpdateSettings({ simulateAndroidDrawer: !settings.simulateAndroidDrawer })}
-            className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
-              settings.simulateAndroidDrawer ? 'bg-emerald-600' : 'bg-slate-300'
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                settings.simulateAndroidDrawer ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
+          <button onClick={() => onUpdateSettings({ simulateAndroidDrawer: !settings.simulateAndroidDrawer })} className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${settings.simulateAndroidDrawer ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+            <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${settings.simulateAndroidDrawer ? 'translate-x-6' : 'translate-x-0'}`} />
           </button>
         </div>
       </div>
 
       {/* 3. Web App & PWA Background Delivery Architecture Guide */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-        <button
-          onClick={() => setShowAndroidGuide(!showAndroidGuide)}
-          className="w-full flex items-center justify-between text-left cursor-pointer"
-        >
+        <button onClick={() => setShowAndroidGuide(!showAndroidGuide)} className="w-full flex items-center justify-between text-left cursor-pointer">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
-              <Info className="w-4 h-4 text-emerald-600" />
-            </div>
+            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold"><Info className="w-4 h-4 text-emerald-600" /></div>
             <div>
               <h3 className="font-bold text-xs text-slate-900">Web App & PWA Notification Architecture</h3>
-              <p className="text-[11px] text-slate-500">
-                Mode: <span className="font-semibold text-slate-800">{isPWA ? 'Installed PWA' : 'Web Browser Tab'}</span> • Background details
-              </p>
+              <p className="text-[11px] text-slate-500">Mode: <span className="font-semibold text-slate-800">{isPWA ? 'Installed PWA' : 'Web Browser Tab'}</span> • Background details</p>
             </div>
           </div>
-          <ChevronRight
-            className={`w-4 h-4 text-slate-400 transition-transform ${
-              showAndroidGuide ? 'rotate-90' : ''
-            }`}
-          />
+          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showAndroidGuide ? 'rotate-90' : ''}`} />
         </button>
 
         {showAndroidGuide && (
           <div className="pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-2.5 leading-relaxed animate-in fade-in duration-200">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <h4 className="font-bold text-slate-900 mb-1">1. Background Service Worker</h4>
-              <p>
-                Textly registers a background Service Worker to manage scheduled alerts. While Textly is running or in a background tab, the Service Worker triggers system notifications precisely on time.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <h4 className="font-bold text-slate-900 mb-1">2. Browser Sleep & Closed App Limitation</h4>
-              <p>
-                Mobile web browsers (Android Chrome, iOS Safari) suspend JavaScript execution if the browser process is completely force-closed. For maximum reliability, keep Textly installed to your home screen (PWA) or keep a browser tab open.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <h4 className="font-bold text-slate-900 mb-1">3. WhatsApp Privacy & Hand-off</h4>
-              <p>
-                WhatsApp does not permit silent automatic message sending without user review. Textly prepares the exact message and opens WhatsApp with one tap for you to press send.
-              </p>
-            </div>
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80"><h4 className="font-bold text-slate-900 mb-1">1. Background Service Worker</h4><p>Textly registers a background Service Worker to manage scheduled alerts. While Textly is running or in a background tab, the Service Worker triggers system notifications precisely on time.</p></div>
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80"><h4 className="font-bold text-slate-900 mb-1">2. Browser Sleep & Closed App Limitation</h4><p>Mobile web browsers (Android Chrome, iOS Safari) suspend JavaScript execution if the browser process is completely force-closed. For maximum reliability, keep Textly installed to your home screen (PWA) or keep a browser tab open.</p></div>
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80"><h4 className="font-bold text-slate-900 mb-1">3. WhatsApp Privacy & Hand-off</h4><p>WhatsApp does not permit silent automatic message sending without user review. Textly prepares the exact message and opens WhatsApp with one tap for you to press send.</p></div>
           </div>
         )}
       </div>
@@ -334,28 +200,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <h3 className="font-bold text-xs text-slate-900">Reset Sample Data</h3>
             <p className="text-[11px] text-slate-500">Restore default sample scheduled messages</p>
           </div>
-          <button
-            onClick={handleReset}
-            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset</span>
-          </button>
+          <button onClick={handleReset} className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"><RefreshCw className="w-3.5 h-3.5" /><span>Reset</span></button>
         </div>
-
-        {resetSuccess && (
-          <p className="text-xs font-semibold text-emerald-600 animate-in fade-in">
-            ✓ Sample data restored successfully!
-          </p>
-        )}
+        {resetSuccess && <p className="text-xs font-semibold text-emerald-600 animate-in fade-in">✓ Sample data restored successfully!</p>}
       </div>
 
-      {/* Notification Unblock Guide Modal */}
-      <NotificationUnblockModal
-        isOpen={showUnblockModal}
-        onClose={() => setShowUnblockModal(false)}
-        onRefreshPermission={onRequestPermission}
-      />
+      <NotificationUnblockModal isOpen={showUnblockModal} onClose={() => setShowUnblockModal(false)} onRefreshPermission={onRequestPermission} />
     </div>
   );
 };
